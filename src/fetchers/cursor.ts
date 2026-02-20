@@ -1,19 +1,28 @@
 import type { NormalizedRecord } from "./types.js";
 
 interface CursorUsageEvent {
-  email: string;
+  userEmail: string;
   timestamp: string;
   model: string;
-  inputTokens: number;
-  outputTokens: number;
-  costCents: number;
+  tokenUsage: {
+    inputTokens: number;
+    outputTokens: number;
+    cacheWriteTokens: number;
+    cacheReadTokens: number;
+    totalCents: number;
+  };
 }
 
 interface CursorUsageResponse {
-  events: CursorUsageEvent[];
-  total: number;
-  page: number;
-  pageSize: number;
+  usageEvents: CursorUsageEvent[];
+  totalUsageEventsCount: number;
+  pagination: {
+    numPages: number;
+    currentPage: number;
+    pageSize: number;
+    hasNextPage: boolean;
+    hasPreviousPage: boolean;
+  };
 }
 
 export async function fetchCursorUsage(
@@ -47,9 +56,10 @@ export async function fetchCursorUsage(
     }
 
     const json = (await res.json()) as CursorUsageResponse;
-    events.push(...json.events);
+    if (!json.usageEvents?.length) break;
+    events.push(...json.usageEvents);
 
-    if (json.events.length < pageSize) break;
+    if (!json.pagination.hasNextPage) break;
     page++;
   } while (true);
 
@@ -60,18 +70,18 @@ export async function fetchCursorUsage(
   >();
 
   for (const event of events) {
-    if (!event.email) continue;
-    const existing = userMap.get(event.email) ?? {
+    if (!event.userEmail) continue;
+    const existing = userMap.get(event.userEmail) ?? {
       requests: 0,
       inputTokens: 0,
       outputTokens: 0,
       costCents: 0,
     };
     existing.requests += 1;
-    existing.inputTokens += event.inputTokens;
-    existing.outputTokens += event.outputTokens;
-    existing.costCents += event.costCents;
-    userMap.set(event.email, existing);
+    existing.inputTokens += event.tokenUsage.inputTokens;
+    existing.outputTokens += event.tokenUsage.outputTokens;
+    existing.costCents += Math.round(event.tokenUsage.totalCents);
+    userMap.set(event.userEmail, existing);
   }
 
   const records: NormalizedRecord[] = [];

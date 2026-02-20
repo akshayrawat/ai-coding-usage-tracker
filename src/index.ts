@@ -8,7 +8,7 @@ import { printTable, sortUsers, type SortKey } from "./table.js";
 function parseArgs(): { days: number; sort: SortKey } {
   const args = process.argv.slice(2);
   let days = 30;
-  let sort: SortKey = "requests";
+  let sort: SortKey = "tokens";
 
   for (let i = 0; i < args.length; i++) {
     if (args[i] === "--days" && args[i + 1]) {

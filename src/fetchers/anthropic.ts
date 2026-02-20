@@ -110,7 +110,7 @@ export async function fetchAnthropicUsage(
     let costCents = 0;
 
     for (const m of entry.model_breakdown) {
-      inputTokens += m.tokens.input + m.tokens.cache_read + m.tokens.cache_creation;
+      inputTokens += m.tokens.input;
       outputTokens += m.tokens.output;
       costCents += m.estimated_cost.amount;
     }
