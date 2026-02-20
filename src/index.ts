@@ -49,14 +49,33 @@ function todayISO(): string {
   return new Date().toISOString().slice(0, 10);
 }
 
+const SPINNER_FRAMES = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"];
+
+function startSpinner(message: string): { stop: () => void; update: (msg: string) => void } {
+  let i = 0;
+  const interval = setInterval(() => {
+    process.stderr.write(`\r\x1b[2K\x1b[2m${SPINNER_FRAMES[i % SPINNER_FRAMES.length]} ${message}\x1b[0m`);
+    i++;
+  }, 80);
+  return {
+    update(msg: string) { message = msg; },
+    stop() {
+      clearInterval(interval);
+      process.stderr.write("\r\x1b[2K");
+    },
+  };
+}
+
 async function main() {
   const { days, sort } = parseArgs();
 
   const fetchers: Promise<NormalizedRecord[]>[] = [];
+  const platforms: string[] = [];
 
   // Anthropic
   const anthropicKey = process.env.ANTHROPIC_ADMIN_API_KEY;
   if (anthropicKey) {
+    platforms.push("Claude");
     fetchers.push(
       fetchAnthropicUsage(anthropicKey, daysAgoISO(days)).catch((err) => {
         console.warn(`[warn] Anthropic fetch failed: ${err.message}`);
@@ -70,6 +89,7 @@ async function main() {
   // OpenAI
   const openaiKey = process.env.OPENAI_ORG_API_KEY;
   if (openaiKey) {
+    platforms.push("OpenAI");
     fetchers.push(
       fetchOpenAIUsage(openaiKey, daysAgoUnix(days)).catch((err) => {
         console.warn(`[warn] OpenAI fetch failed: ${err.message}`);
@@ -83,6 +103,7 @@ async function main() {
   // Cursor
   const cursorKey = process.env.CURSOR_ADMIN_API_KEY;
   if (cursorKey) {
+    platforms.push("Cursor");
     const maxDays = Math.min(days, 90); // Cursor has 90-day max lookback
     fetchers.push(
       fetchCursorUsage(cursorKey, daysAgoISO(maxDays), todayISO()).catch((err) => {
@@ -105,7 +126,9 @@ async function main() {
     process.exit(1);
   }
 
+  const spinner = startSpinner(`Fetching usage from ${platforms.join(", ")}…`);
   const results = await Promise.all(fetchers);
+  spinner.stop();
   const allRecords = results.flat();
 
   if (allRecords.length === 0) {
