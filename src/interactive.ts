@@ -29,7 +29,21 @@ interface State {
 
 function applyFilter(users: MergedUser[], filter: FilterKey): MergedUser[] {
   if (filter === "all") return users;
-  return users.filter((u) => u.platforms.has(filter));
+  // When filtering by platform, only show that platform's usage per engineer
+  return users
+    .filter((u) => u.platforms.has(filter))
+    .map((u) => {
+      const platUsage = u.byPlatform.get(filter)!;
+      return {
+        ...u,
+        requests: platUsage.requests,
+        tokens: platUsage.tokens,
+        costCents: platUsage.costCents,
+        // Single-platform view: only show that platform, no sub-rows needed
+        platforms: new Set([filter]) as Set<Platform>,
+        byPlatform: new Map([[filter, platUsage]]),
+      };
+    });
 }
 
 function renderFilterBar(filter: FilterKey): string {
