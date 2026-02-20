@@ -5,7 +5,7 @@ A CLI tool that pulls per-engineer usage data from **Anthropic Claude Code**, **
 ```
 AI Coding Usage Leaderboard (Last 30 days)
 ═══════════════════════════════════════════════════════════════════════════════
- #  Engineer              Requests   Tokens      Cost     Tools
+ #  User              Requests   Tokens      Cost     Tools
 ───────────────────────────────────────────────────────────────────────────────
  1  alice@company.com        342     2.1M     $127.40    Claude, Cursor
  2  bob@company.com          285     1.8M      $98.20    Claude, OpenAI, Cursor
@@ -65,6 +65,17 @@ bun src/index.ts --sort tokens
 | `--sort <key>` | `requests` | Sort by `requests`, `tokens`, or `cost` |
 
 > **Note:** Cursor has a 90-day maximum lookback. If `--days` exceeds 90, the Cursor query is capped at 90 days.
+
+### Columns
+
+| Column | Description |
+|---|---|
+| **#** | Rank by the chosen sort key (default: requests) |
+| **User** | Email address (or OpenAI user ID) identifying the person |
+| **Requests** | Number of sessions (Claude Code), API requests (OpenAI), or events (Cursor) |
+| **Tokens** | Total input + output + cache tokens across all models |
+| **Cost** | Estimated cost in USD, summed across platforms |
+| **Tools** | Which platforms the user has activity on (Claude, OpenAI, Cursor) |
 
 ## How It Works
 

@@ -22,6 +22,7 @@ export function mergeByEmail(records: NormalizedRecord[]): MergedUser[] {
   const map = new Map<string, MergedUser>();
 
   for (const r of records) {
+    if (!r.email) continue;
     const key = r.email.toLowerCase();
     let user = map.get(key);
     if (!user) {

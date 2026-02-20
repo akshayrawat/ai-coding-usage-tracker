@@ -54,7 +54,7 @@ export function printTable(users: MergedUser[], days: number, sortBy: SortKey): 
 
   const header = [
     pad("#", cols.rank, "right"),
-    pad("Engineer", cols.email),
+    pad("User", cols.email),
     pad("Requests", cols.requests, "right"),
     pad("Tokens", cols.tokens, "right"),
     pad("Cost", cols.cost, "right"),

@@ -60,6 +60,7 @@ export async function fetchCursorUsage(
   >();
 
   for (const event of events) {
+    if (!event.email) continue;
     const existing = userMap.get(event.email) ?? {
       requests: 0,
       inputTokens: 0,

@@ -84,6 +84,7 @@ export async function fetchOpenAIUsage(
   for (const page of usagePages) {
     for (const bucket of page.data) {
       for (const entry of bucket.results) {
+        if (!entry.user_id) continue;
         const existing = userMap.get(entry.user_id) ?? {
           requests: 0,
           inputTokens: 0,
