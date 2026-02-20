@@ -32,7 +32,7 @@ export async function fetchCursorUsage(
 ): Promise<NormalizedRecord[]> {
   const events: CursorUsageEvent[] = [];
   let page = 1;
-  const pageSize = 100;
+  const pageSize = 500;
 
   const authHeader =
     "Basic " + Buffer.from(apiKey + ":").toString("base64");

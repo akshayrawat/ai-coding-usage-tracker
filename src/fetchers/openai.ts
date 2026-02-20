@@ -14,19 +14,48 @@ interface UsageResponse {
   next_page?: string;
 }
 
-interface CostBucketEntry {
-  user_id: string;
-  user_email?: string;
-  amount: {
-    value: string; // decimal string in USD
-    currency: string;
-  };
+interface OrgUser {
+  object: string;
+  id: string;
+  email: string;
+  name: string;
+  role: string;
 }
 
-interface CostResponse {
-  data: { results: CostBucketEntry[] }[];
+interface OrgUsersResponse {
+  data: OrgUser[];
   has_more: boolean;
-  next_page?: string;
+  last_id?: string;
+}
+
+/** Fetch all org members to build user_id → email map */
+async function fetchOrgMembers(apiKey: string): Promise<Map<string, string>> {
+  const map = new Map<string, string>();
+  let after: string | undefined;
+
+  do {
+    const url = new URL("https://api.openai.com/v1/organization/users");
+    url.searchParams.set("limit", "100");
+    if (after) url.searchParams.set("after", after);
+
+    const res = await fetch(url.toString(), {
+      headers: { Authorization: `Bearer ${apiKey}` },
+    });
+
+    if (!res.ok) {
+      // Non-fatal: fall back to user_email from usage data
+      console.warn(`[warn] OpenAI org members fetch failed: ${res.status}`);
+      break;
+    }
+
+    const json = (await res.json()) as OrgUsersResponse;
+    for (const user of json.data) {
+      map.set(user.id, user.email);
+    }
+    after = json.has_more ? json.data[json.data.length - 1]?.id : undefined;
+  } while (after);
+
+  return map;
 }
 
 async function fetchAllPages<T extends { has_more: boolean; next_page?: string }>(
@@ -67,23 +96,17 @@ export async function fetchOpenAIUsage(
 ): Promise<NormalizedRecord[]> {
   const startTime = String(startUnix);
 
-  const [usagePages, costPages] = await Promise.all([
+  const [usagePages, orgMembers] = await Promise.all([
     fetchAllPages<UsageResponse>(
       "https://api.openai.com/v1/organization/usage/completions",
       apiKey,
-      { start_time: startTime, bucket_width: "1d", "group_by[]": "user_id" }
+      { start_time: startTime, bucket_width: "1d", "group_by[]": "user_id", limit: "31" }
     ),
-    fetchAllPages<CostResponse>(
-      "https://api.openai.com/v1/organization/costs",
-      apiKey,
-      { start_time: startTime, "group_by[]": "user_id" }
-    ),
+    fetchOrgMembers(apiKey),
   ]);
 
-  // Build user_id → email mapping from both usage and cost results
-  const emailMap = new Map<string, string>();
-
-  // Aggregate usage by user_id
+  // Merge org member emails with any emails from usage data
+  const emailMap = new Map<string, string>(orgMembers);
   const userMap = new Map<
     string,
     { requests: number; inputTokens: number; outputTokens: number }
@@ -107,23 +130,8 @@ export async function fetchOpenAIUsage(
     }
   }
 
-  // Aggregate costs by user_id
-  const costMap = new Map<string, number>();
-  for (const page of costPages) {
-    for (const bucket of page.data) {
-      for (const entry of bucket.results) {
-        if (!entry.user_id) continue;
-        if (entry.user_email) emailMap.set(entry.user_id, entry.user_email);
-        const dollars = parseFloat(entry.amount.value);
-        const cents = Math.round(dollars * 100);
-        costMap.set(
-          entry.user_id,
-          (costMap.get(entry.user_id) ?? 0) + cents
-        );
-      }
-    }
-  }
-
+  // Note: OpenAI costs endpoint doesn't support per-user grouping,
+  // so per-user cost is not available from this API.
   const records: NormalizedRecord[] = [];
   for (const [userId, usage] of userMap) {
     records.push({
@@ -132,7 +140,7 @@ export async function fetchOpenAIUsage(
       requests: usage.requests,
       inputTokens: usage.inputTokens,
       outputTokens: usage.outputTokens,
-      costCents: costMap.get(userId) ?? 0,
+      costCents: 0,
     });
   }
 
