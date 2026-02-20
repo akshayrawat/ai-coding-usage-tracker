@@ -1,11 +1,18 @@
 import type { NormalizedRecord, Platform } from "./fetchers/types.js";
 
+export interface PlatformUsage {
+  requests: number;
+  tokens: number;
+  costCents: number;
+}
+
 export interface MergedUser {
   email: string;
   requests: number;
   tokens: number;
   costCents: number;
   platforms: Set<Platform>;
+  byPlatform: Map<Platform, PlatformUsage>;
 }
 
 const platformLabel: Record<Platform, string> = {
@@ -32,13 +39,21 @@ export function mergeByEmail(records: NormalizedRecord[]): MergedUser[] {
         tokens: 0,
         costCents: 0,
         platforms: new Set(),
+        byPlatform: new Map(),
       };
       map.set(key, user);
     }
+    const tokens = r.inputTokens + r.outputTokens;
     user.requests += r.requests;
-    user.tokens += r.inputTokens + r.outputTokens;
+    user.tokens += tokens;
     user.costCents += r.costCents;
     user.platforms.add(r.platform);
+
+    const plat = user.byPlatform.get(r.platform) ?? { requests: 0, tokens: 0, costCents: 0 };
+    plat.requests += r.requests;
+    plat.tokens += tokens;
+    plat.costCents += r.costCents;
+    user.byPlatform.set(r.platform, plat);
   }
 
   return Array.from(map.values());

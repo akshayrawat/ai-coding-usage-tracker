@@ -2,6 +2,7 @@ import type { NormalizedRecord } from "./types.js";
 
 interface UsageBucketEntry {
   user_id: string;
+  user_email?: string;
   input_tokens: number;
   output_tokens: number;
   num_model_requests: number;
@@ -15,7 +16,11 @@ interface UsageResponse {
 
 interface CostBucketEntry {
   user_id: string;
-  amount_cents: number;
+  user_email?: string;
+  amount: {
+    value: string; // decimal string in USD
+    currency: string;
+  };
 }
 
 interface CostResponse {
@@ -75,6 +80,9 @@ export async function fetchOpenAIUsage(
     ),
   ]);
 
+  // Build user_id → email mapping from both usage and cost results
+  const emailMap = new Map<string, string>();
+
   // Aggregate usage by user_id
   const userMap = new Map<
     string,
@@ -85,6 +93,7 @@ export async function fetchOpenAIUsage(
     for (const bucket of page.data) {
       for (const entry of bucket.results) {
         if (!entry.user_id) continue;
+        if (entry.user_email) emailMap.set(entry.user_id, entry.user_email);
         const existing = userMap.get(entry.user_id) ?? {
           requests: 0,
           inputTokens: 0,
@@ -103,9 +112,13 @@ export async function fetchOpenAIUsage(
   for (const page of costPages) {
     for (const bucket of page.data) {
       for (const entry of bucket.results) {
+        if (!entry.user_id) continue;
+        if (entry.user_email) emailMap.set(entry.user_id, entry.user_email);
+        const dollars = parseFloat(entry.amount.value);
+        const cents = Math.round(dollars * 100);
         costMap.set(
           entry.user_id,
-          (costMap.get(entry.user_id) ?? 0) + entry.amount_cents
+          (costMap.get(entry.user_id) ?? 0) + cents
         );
       }
     }
@@ -114,7 +127,7 @@ export async function fetchOpenAIUsage(
   const records: NormalizedRecord[] = [];
   for (const [userId, usage] of userMap) {
     records.push({
-      email: userId, // OpenAI may only provide user_id, not email
+      email: emailMap.get(userId) ?? userId,
       platform: "openai",
       requests: usage.requests,
       inputTokens: usage.inputTokens,

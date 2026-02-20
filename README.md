@@ -4,13 +4,18 @@ A CLI tool that pulls per-engineer usage data from **Anthropic Claude Code**, **
 
 ```
 AI Coding Usage Leaderboard (Last 30 days)
-═══════════════════════════════════════════════════════════════════════════════
- #  User              Requests   Tokens      Cost     Tools
-───────────────────────────────────────────────────────────────────────────────
- 1  alice@company.com        342     2.1M     $127.40    Claude, Cursor
- 2  bob@company.com          285     1.8M      $98.20    Claude, OpenAI, Cursor
- 3  carol@company.com        201     1.2M      $67.50    Claude, OpenAI
-═══════════════════════════════════════════════════════════════════════════════
+════════════════════════════════════════════════════════════════════════════════
+  #   User                Requests   Tokens      Cost   Tools
+────────────────────────────────────────────────────────────────────────────────
+  1   alice@company.com        342     2.1M   $127.40   Claude, OpenAI
+        Claude                 220     1.5M    $95.00
+        OpenAI                 122   620.3K    $32.40
+  2   bob@company.com          285     1.8M    $98.20   Claude, OpenAI, Cursor
+        Claude                 150     1.0M    $60.00
+        OpenAI                  85   500.0K    $25.20
+        Cursor                  50   300.0K    $13.00
+  3   carol@company.com        201     1.2M    $67.50   Claude
+════════════════════════════════════════════════════════════════════════════════
 ```
 
 ## Setup
@@ -38,7 +43,7 @@ cp .env.example .env
 | Variable | Source | Required |
 |---|---|---|
 | `ANTHROPIC_ADMIN_API_KEY` | [Anthropic Admin Console](https://console.anthropic.com/) — needs admin-level key (`sk-ant-admin-...`) | No |
-| `OPENAI_ORG_API_KEY` | [OpenAI API Keys](https://platform.openai.com/api-keys) — needs org-level read access | No |
+| `OPENAI_ORG_API_KEY` | [OpenAI Admin Keys](https://platform.openai.com/organization/admin-keys) — requires an Admin API key (not a regular API key), org Owner role needed | No |
 | `CURSOR_ADMIN_API_KEY` | Cursor team admin settings | No |
 
 At least one key must be set. Platforms with missing keys are skipped with a warning.

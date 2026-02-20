@@ -24,25 +24,47 @@ function pad(s: string, width: number, align: "left" | "right" = "left"): string
   return s.padEnd(width);
 }
 
+interface RowData {
+  rank: string;
+  email: string;
+  requests: string;
+  tokens: string;
+  cost: string;
+  tools: string;
+  subRows?: { platform: string; requests: string; tokens: string; cost: string }[];
+}
+
 export function printTable(users: MergedUser[], days: number, sortBy: SortKey): void {
   const title = `AI Coding Usage Leaderboard (Last ${days} days)`;
 
   // Prepare row data
-  const rows = users.map((u, i) => ({
-    rank: String(i + 1),
-    email: u.email,
-    requests: String(u.requests),
-    tokens: formatTokens(u.tokens),
-    cost: formatCost(u.costCents),
-    tools: Array.from(u.platforms)
-      .map((p) => platformDisplayName(p as Platform))
-      .join(", "),
-  }));
+  const rows: RowData[] = users.map((u, i) => {
+    const subRows = u.byPlatform.size > 1
+      ? Array.from(u.byPlatform.entries()).map(([p, usage]) => ({
+          platform: platformDisplayName(p),
+          requests: String(usage.requests),
+          tokens: formatTokens(usage.tokens),
+          cost: formatCost(usage.costCents),
+        }))
+      : undefined;
+
+    return {
+      rank: String(i + 1),
+      email: u.email,
+      requests: String(u.requests),
+      tokens: formatTokens(u.tokens),
+      cost: formatCost(u.costCents),
+      tools: Array.from(u.platforms)
+        .map((p) => platformDisplayName(p as Platform))
+        .join(", "),
+      subRows,
+    };
+  });
 
   // Column widths
   const cols = {
     rank: Math.max(2, ...rows.map((r) => r.rank.length)),
-    email: Math.max(8, ...rows.map((r) => r.email.length)),
+    email: Math.max(4, ...rows.map((r) => r.email.length)),
     requests: Math.max(8, ...rows.map((r) => r.requests.length)),
     tokens: Math.max(6, ...rows.map((r) => r.tokens.length)),
     cost: Math.max(6, ...rows.map((r) => r.cost.length)),
@@ -80,6 +102,20 @@ export function printTable(users: MergedUser[], days: number, sortBy: SortKey): 
       pad(row.tools, cols.tools),
     ].join("   ");
     console.log(" " + line);
+
+    if (row.subRows) {
+      for (const sub of row.subRows) {
+        const subLine = [
+          pad("", cols.rank),
+          pad("  " + sub.platform, cols.email),
+          pad(sub.requests, cols.requests, "right"),
+          pad(sub.tokens, cols.tokens, "right"),
+          pad(sub.cost, cols.cost, "right"),
+          pad("", cols.tools),
+        ].join("   ");
+        console.log(" " + subLine);
+      }
+    }
   }
 
   console.log(doubleLine);
