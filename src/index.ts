@@ -3,7 +3,8 @@ import { fetchAnthropicUsage } from "./fetchers/anthropic.js";
 import { fetchOpenAIUsage } from "./fetchers/openai.js";
 import { fetchCursorUsage } from "./fetchers/cursor.js";
 import { mergeByEmail } from "./identity.js";
-import { printTable, sortUsers, type SortKey } from "./table.js";
+import { type SortKey } from "./table.js";
+import { runInteractive } from "./interactive.js";
 
 function parseArgs(): { days: number; sort: SortKey } {
   const args = process.argv.slice(2);
@@ -113,8 +114,7 @@ async function main() {
   }
 
   const merged = mergeByEmail(allRecords);
-  const sorted = sortUsers(merged, sort);
-  printTable(sorted, days, sort);
+  runInteractive(merged, days, sort);
 }
 
 main().catch((err) => {

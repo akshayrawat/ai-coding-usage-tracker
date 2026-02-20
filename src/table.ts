@@ -4,18 +4,21 @@ import type { Platform } from "./fetchers/types.js";
 
 export type SortKey = "requests" | "tokens" | "cost";
 
+const UNDERLINE = "\x1b[4m";
+const RESET = "\x1b[0m";
+
 export function sortUsers(users: MergedUser[], sortBy: SortKey): MergedUser[] {
   const key = sortBy === "cost" ? "costCents" : sortBy;
   return [...users].sort((a, b) => b[key] - a[key]);
 }
 
-function formatTokens(n: number): string {
+export function formatTokens(n: number): string {
   if (n >= 1_000_000) return (n / 1_000_000).toFixed(1) + "M";
   if (n >= 1_000) return (n / 1_000).toFixed(1) + "K";
   return String(n);
 }
 
-function formatCost(cents: number): string {
+export function formatCost(cents: number): string {
   return "$" + (cents / 100).toFixed(2);
 }
 
@@ -34,8 +37,9 @@ interface RowData {
   subRows?: { platform: string; requests: string; tokens: string; cost: string }[];
 }
 
-export function printTable(users: MergedUser[], days: number, sortBy: SortKey): void {
-  const title = `AI Coding Usage Leaderboard (Last ${days} days)`;
+export function renderTableLines(users: MergedUser[], days: number, sortBy: SortKey): string[] {
+  const lines: string[] = [];
+  const title = `AI Coding Usage Leaderboard  |  Last ${days} days`;
 
   // Prepare row data
   const rows: RowData[] = users.map((u, i) => {
@@ -72,25 +76,30 @@ export function printTable(users: MergedUser[], days: number, sortBy: SortKey): 
   };
 
   const totalWidth =
-    cols.rank + cols.email + cols.requests + cols.tokens + cols.cost + cols.tools + 15; // spacing
+    cols.rank + cols.email + cols.requests + cols.tokens + cols.cost + cols.tools + 15;
 
+  // Header labels with underline on active sort column
+  const reqLabel = sortBy === "requests" ? `${UNDERLINE}Requests${RESET}` : "Requests";
+  const tokLabel = sortBy === "tokens" ? `${UNDERLINE}Tokens${RESET}` : "Tokens";
+  const costLabel = sortBy === "cost" ? `${UNDERLINE}Cost${RESET}` : "Cost";
+
+  // Pad based on raw text width (ANSI codes are zero-width)
   const header = [
     pad("#", cols.rank, "right"),
     pad("User", cols.email),
-    pad("Requests", cols.requests, "right"),
-    pad("Tokens", cols.tokens, "right"),
-    pad("Cost", cols.cost, "right"),
+    reqLabel + " ".repeat(Math.max(0, cols.requests - 8)),
+    tokLabel + " ".repeat(Math.max(0, cols.tokens - 6)),
+    costLabel + " ".repeat(Math.max(0, cols.cost - 4)),
     pad("Tools", cols.tools),
   ].join("   ");
 
   const doubleLine = "\u2550".repeat(totalWidth);
   const singleLine = "\u2500".repeat(totalWidth);
 
-  console.log();
-  console.log(title);
-  console.log(doubleLine);
-  console.log(" " + header);
-  console.log(singleLine);
+  lines.push(title);
+  lines.push(doubleLine);
+  lines.push(" " + header);
+  lines.push(singleLine);
 
   for (const row of rows) {
     const line = [
@@ -101,7 +110,7 @@ export function printTable(users: MergedUser[], days: number, sortBy: SortKey): 
       pad(row.cost, cols.cost, "right"),
       pad(row.tools, cols.tools),
     ].join("   ");
-    console.log(" " + line);
+    lines.push(" " + line);
 
     if (row.subRows) {
       for (const sub of row.subRows) {
@@ -113,11 +122,11 @@ export function printTable(users: MergedUser[], days: number, sortBy: SortKey): 
           pad(sub.cost, cols.cost, "right"),
           pad("", cols.tools),
         ].join("   ");
-        console.log(" " + subLine);
+        lines.push(" " + subLine);
       }
     }
   }
 
-  console.log(doubleLine);
-  console.log();
+  lines.push(doubleLine);
+  return lines;
 }
