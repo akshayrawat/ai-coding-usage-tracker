@@ -1,5 +1,7 @@
 # AI Coding Usage Tracker
 
+[![CI](https://github.com/akshayrawat/ai-coding-usage-tracker/actions/workflows/ci.yml/badge.svg)](https://github.com/akshayrawat/ai-coding-usage-tracker/actions/workflows/ci.yml)
+
 A CLI tool that pulls per-engineer usage data from **Anthropic Claude Code**, **OpenAI**, and **Cursor** admin APIs and prints a ranked leaderboard in your terminal.
 
 ```
