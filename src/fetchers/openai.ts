@@ -14,6 +14,16 @@ interface UsageResponse {
   next_page?: string;
 }
 
+interface CostBucketEntry {
+  amount: { value: number; currency: string };
+}
+
+interface CostResponse {
+  data: { results: CostBucketEntry[] }[];
+  has_more: boolean;
+  next_page?: string;
+}
+
 interface OrgUser {
   object: string;
   id: string;
@@ -96,14 +106,32 @@ export async function fetchOpenAIUsage(
 ): Promise<NormalizedRecord[]> {
   const startTime = String(startUnix);
 
-  const [usagePages, orgMembers] = await Promise.all([
+  const [usagePages, costPages, orgMembers] = await Promise.all([
     fetchAllPages<UsageResponse>(
       "https://api.openai.com/v1/organization/usage/completions",
       apiKey,
       { start_time: startTime, bucket_width: "1d", "group_by[]": "user_id", limit: "31" }
     ),
+    fetchAllPages<CostResponse>(
+      "https://api.openai.com/v1/organization/costs",
+      apiKey,
+      { start_time: startTime, bucket_width: "1d", limit: "180" }
+    ).catch((err) => {
+      console.warn(`[warn] OpenAI costs fetch failed: ${err.message}`);
+      return [] as CostResponse[];
+    }),
     fetchOrgMembers(apiKey),
   ]);
+
+  // Sum total org cost (in USD)
+  let totalCostUsd = 0;
+  for (const page of costPages) {
+    for (const bucket of page.data) {
+      for (const entry of bucket.results) {
+        totalCostUsd += Number(entry.amount?.value) || 0;
+      }
+    }
+  }
 
   // Merge org member emails with any emails from usage data
   const emailMap = new Map<string, string>(orgMembers);
@@ -122,25 +150,35 @@ export async function fetchOpenAIUsage(
           inputTokens: 0,
           outputTokens: 0,
         };
-        existing.requests += entry.num_model_requests;
-        existing.inputTokens += entry.input_tokens;
-        existing.outputTokens += entry.output_tokens;
+        existing.requests += entry.num_model_requests ?? 0;
+        existing.inputTokens += entry.input_tokens ?? 0;
+        existing.outputTokens += entry.output_tokens ?? 0;
         userMap.set(entry.user_id, existing);
       }
     }
   }
 
-  // Note: OpenAI costs endpoint doesn't support per-user grouping,
-  // so per-user cost is not available from this API.
+  // OpenAI costs API doesn't support per-user grouping, so distribute
+  // total org cost proportionally by each user's token share.
+  const totalCostCents = Math.round(totalCostUsd * 100);
+  let orgTotalTokens = 0;
+  for (const usage of userMap.values()) {
+    orgTotalTokens += usage.inputTokens + usage.outputTokens;
+  }
+
   const records: NormalizedRecord[] = [];
   for (const [userId, usage] of userMap) {
+    const userTokens = usage.inputTokens + usage.outputTokens;
+    const costCents = orgTotalTokens > 0
+      ? Math.round(totalCostCents * (userTokens / orgTotalTokens))
+      : 0;
     records.push({
       email: emailMap.get(userId) ?? userId,
       platform: "openai",
       requests: usage.requests,
       inputTokens: usage.inputTokens,
       outputTokens: usage.outputTokens,
-      costCents: 0,
+      costCents,
     });
   }
 
